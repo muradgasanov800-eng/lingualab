@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LinguaLab — Умное изучение языков</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background-color: #090d16;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        /* Анимации */
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-8px) rotate(2deg); }
+        }
+        @keyframes fadeSlideUp {
+            from { opacity: 0; transform: translateY(18px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes pulseRing {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4), 0 5px 0 #0f172a; }
+            50% { box-shadow: 0 0 22px 4px rgba(56, 189, 248, 0.25), 0 5px 0 #0f172a; }
+        }
+        @keyframes shakeError {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-7px); }
+            40%, 80% { transform: translateX(7px); }
+        }
+        @keyframes popScale {
+            0% { transform: scale(0.8); }
+            60% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+        .animate-float { animation: floatSlow 3.5s ease-in-out infinite; }
+        .animate-enter { animation: fadeSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-shake { animation: shakeError 0.4s ease-in-out; }
+        .animate-pop { animation: popScale 0.25s ease-out forwards; }
+        .glow-active { animation: pulseRing 2.5s infinite; }
+
+        /* Тактильные 3D-кнопки */
+        .btn-3d-emerald {
+            background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+            box-shadow: 0 5px 0 #15803d, 0 10px 20px rgba(34, 197, 94, 0.25);
+            transition: all 0.1s ease;
+        }
+        .btn-3d-emerald:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 #15803d;
+        }
+        .btn-3d-sky {
+            background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+            box-shadow: 0 5px 0 #0369a1, 0 10px 20px rgba(56, 189, 248, 0.25);
+            transition: all 0.1s ease;
+        }
+        .btn-3d-sky:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 #0369a1;
+        }
+        .btn-3d-gold {
+            background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+            box-shadow: 0 5px 0 #b45309, 0 10px 20px rgba(245, 158, 11, 0.3);
+            transition: all 0.1s ease;
+        }
+        .btn-3d-gold:active {
+            transform: translateY(5px);
+            box-shadow: 0 0 0 #b45309;
+        }
+        .card-3d {
+            background-color: #151e31;
+            border: 2px solid #26334d;
+            box-shadow: 0 5px 0 #0b101b;
+            transition: all 0.12s ease;
+        }
+        .card-3d:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #0b101b;
+        }
+        .opt-selected {
+            border-color: #38bdf8 !important;
+            background-color: rgba(56, 189, 248, 0.16) !important;
+            box-shadow: 0 4px 0 #0284c7 !important;
+            color: #7dd3fc !important;
+        }
+        .pair-matched {
+            border-color: #22c55e !important;
+            background-color: rgba(34, 197, 94, 0.15) !important;
+            opacity: 0.45;
+            pointer-events: none;
+        }
+        .glass-bar {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        /* 3D Карточки словаря */
+        .perspective { perspective: 1000px; }
+        .flip-inner {
+            transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .is-flipped { transform: rotateY(180deg); }
+        .face-front, .face-back {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .face-back { transform: rotateY(180deg); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-24">
+
+    <!-- 1. ЗАСТАВКА ПРИ ЗАПУСКЕ (SPLASH SCREEN) -->
+    <div id="splash" class="fixed inset-0 z-50 bg-[#090d16] flex flex-col items-center justify-center p-6 transition-opacity duration-500">
+        <div class="relative">
+            <div class="absolute -inset-4 rounded-full bg-sky-500/20 blur-xl animate-pulse"></div>
+            <div class="relative w-24 h-24 rounded-3xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center text-5xl shadow-2xl animate-float">
+                🧬
+            </div>
+        </div>
+        <h1 class="text-3xl font-black mt-6 tracking-tight bg-gradient-to-r from-white via-sky-200 to-indigo-300 bg-clip-text text-transparent">
+            LinguaLab
+        </h1>
+        <p class="text-xs text-slate-400 font-extrabold uppercase tracking-widest mt-1.5">
+            Понимай логику языка • Не зубри
+        </p>
+        <div class="w-40 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-6">
+            <div class="h-full bg-sky-400 w-full animate-pulse"></div>
+        </div>
+    </div>
+
+    <!-- 2. ВЕРХНЯЯ ПАНЕЛЬ СТАТИСТИКИ -->
+    <header id="app-header" class="sticky top-0 z-30 glass-bar border-b border-slate-800/80 px-3.5 py-2.5 flex items-center justify-between">
+        <!-- Выбор языка -->
+        <button onclick="openModal('modal-lang')" class="flex items-center space-x-1.5 bg-slate-800/90 border border-slate-700 px-2.5 py-1.5 rounded-xl active:scale-95 transition">
+            <span class="text-lg">🇬🇧</span>
+            <span class="font-black text-xs text-white">EN</span>
+            <span class="text-[10px] text-slate-400">▼</span>
+        </button>
+
+        <!-- Показатели игрока -->
+        <div class="flex items-center space-x-2">
+            <button onclick="openModal('modal-pro')" class="flex items-center space-x-1 bg-orange-500/15 border border-orange-500/30 px-2.5 py-1 rounded-xl text-orange-400 font-black text-xs">
+                <span>🔥</span>
+                <span id="ui-streak">1</span>
+            </button>
+            <button onclick="openModal('modal-pro')" class="flex items-center space-x-1 bg-sky-500/15 border border-sky-500/30 px-2.5 py-1 rounded-xl text-sky-400 font-black text-xs">
+                <span>💎</span>
+                <span id="ui-gems">120</span>
+            </button>
+            <button onclick="openModal('modal-pro')" class="flex items-center space-x-1 bg-rose-500/15 border border-rose-500/30 px-2.5 py-1 rounded-xl text-rose-400 font-black text-xs">
+                <span>❤️</span>
+                <span id="ui-hearts">5</span>
+            </button>
+            <button onclick="toggleSound()" id="sound-btn" class="w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xs">
+                🔊
+            </button>
+        </div>
+    </header>
+
+    <!-- 3. ВКЛАДКА 1: КАРТА КУРСА -->
+    <main id="view-learn" class="flex-1 max-w-md w-full mx-auto p-4 space-y-6 animate-enter">
+        <!-- Приветственная карточка + Дневной план -->
+        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-500 p-5 shadow-xl shadow-blue-950/60">
+            <div class="relative z-10">
+                <div class="flex items-center justify-between">
+                    <span id="pro-pill" class="text-[10px] font-black uppercase tracking-wider bg-black/25 px-2.5 py-1 rounded-full">
+                        🇬🇧 Английский: Уровень A1–A2
+                    </span>
+                    <button onclick="openModal('modal-pro')" class="text-[11px] font-black bg-amber-400 text-slate-950 px-2.5 py-1 rounded-full shadow">
+                        👑 PRO Доступ
+                    </button>
+                </div>
+                <h2 id="user-hello" class="text-2xl font-black mt-2.5">Привет, Чемпион! 👋</h2>
+                <p class="text-xs text-blue-100 mt-1 font-semibold">
+                    В каждом модуле сначала открой <b>глубокую теорию с формулами</b>, а затем закрепи её на 5 типах тренажеров.
+                </p>
+
+                <!-- Шкала опыта за день -->
+                <div class="mt-4 bg-slate-950/35 rounded-2xl p-3 backdrop-blur-sm border border-white/10">
+                    <div class="flex justify-between text-xs font-extrabold mb-1.5">
+                        <span>⚡ Дневная цель опыта</span>
+                        <span id="ui-goal-text">0 / 100 XP</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-slate-950/60 rounded-full overflow-hidden">
+                        <div id="ui-goal-bar" class="h-full bg-gradient-to-r from-amber-300 to-emerald-400 transition-all duration-500" style="width: 8%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="absolute -right-4 -bottom-6 text-8xl opacity-15 pointer-events-none">🧬</div>
+        </div>
+
+        <!-- СПИСОК ЮНИТОВ (Рендерится динамически из базы) -->
+        <div id="units-container" class="space-y-7"></div>
+    </main>
+
+    <!-- 4. ВКЛАДКА 2: УМНЫЙ СЛОВАРЬ + БЛИЦ-ТРЕНАЖЕР СЛОВ -->
+    <main id="view-words" class="hidden flex-1 max-w-md w-full mx-auto p-4 space-y-4 animate-enter">
+        <div class="card-3d rounded-3xl p-4 flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-black uppercase text-sky-400">Интервальное повторение</span>
+                <h2 class="text-xl font-black mt-0.5">Интерактивный словарь</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Нажми на карточку для переворота и озвучки</p>
+            </div>
+            <button onclick="startVocabBlitz()" class="btn-3d-emerald px-3.5 py-2.5 rounded-2xl font-black text-xs text-white">
+                ⚡ Блиц-тест
+            </button>
+        </div>
+
+        <!-- Фильтр категорий -->
+        <div class="flex space-x-2 overflow-x-auto pb-1 text-xs font-extrabold">
+            <button onclick="filterVocab('all')" class="vocab-filter bg-sky-500 text-slate-950 px-3.5 py-1.5 rounded-xl">Все слова (12)</button>
+            <button onclick="filterVocab('verbs')" class="vocab-filter bg-slate-800 text-slate-300 px-3.5 py-1.5 rounded-xl">Глаголы</button>
+            <button onclick="filterVocab('phrases')" class="vocab-filter bg-slate-800 text-slate-300 px-3.5 py-1.5 rounded-xl">Разговорные</button>
+        </div>
+
+        <div id="vocab-cards-grid" class="grid grid-cols-2 gap-3"></div>
+    </main>
+
+    <!-- 5. ВКЛАДКА 3: ЛИГА И РЕЙТИНГ -->
+    <main id="view-league" class="hidden flex-1 max-w-md w-full mx-auto p-4 space-y-4 animate-enter">
+        <div class="text-center p-5 rounded-3xl bg-gradient-to-b from-amber-500/20 to-slate-900 border border-amber-500/30">
+            <div class="text-5xl animate-float">🏆</div>
+            <h2 class="text-xl font-black mt-2 text-amber-300">Изумрудная Лига</h2>
+            <p class="text-xs text-slate-300 mt-1">Проходи уроки и зарабатывай XP, чтобы войти в ТОП-3 недели!</p>
+        </div>
+
+        <div id="leaderboard-list" class="space-y-2.5"></div>
+    </main>
+
+    <!-- 6. ВКЛАДКА 4: ПРОФИЛЬ И МОНЕТИЗАЦИЯ (PRO) -->
+    <main id="view-profile" class="hidden flex-1 max-w-md w-full mx-auto p-4 space-y-4 animate-enter">
+        <div class="card-3d rounded-3xl p-5 flex items-center justify-between">
+            <div class="flex items-center space-x-3.5">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center text-3xl shadow-lg">
+                    🎓
+                </div>
+                <div>
+                    <h2 id="prof-name" class="text-xl font-black">Студент</h2>
+                    <p id="prof-status" class="text-xs text-sky-400 font-extrabold mt-0.5">Статус: Базовый аккаунт</p>
+                </div>
+            </div>
+            <button onclick="openModal('modal-pro')" class="btn-3d-gold text-slate-950 font-black text-xs px-3 py-2 rounded-xl">
+                👑 PRO
+            </button>
+        </div>
+
+        <!-- Статистика -->
+        <div class="grid grid-cols-3 gap-2.5 text-center">
+            <div class="card-3d p-3.5 rounded-2xl">
+                <div class="text-xl">⚡</div>
+                <div id="prof-xp" class="text-lg font-black text-sky-400 mt-1">0</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Опыт XP</div>
+            </div>
+            <div class="card-3d p-3.5 rounded-2xl">
+                <div class="text-xl">🔥</div>
+                <div id="prof-streak" class="text-lg font-black text-orange-400 mt-1">1</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Дней подряд</div>
+            </div>
+            <div class="card-3d p-3.5 rounded-2xl">
+                <div class="text-xl">✅</div>
+                <div id="prof-done" class="text-lg font-black text-emerald-400 mt-1">0</div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Уроков</div>
+            </div>
+        </div>
+
+        <!-- Баннер PRO -->
+        <div onclick="openModal('modal-pro')" class="p-4 rounded-3xl bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-orange-500/20 border-2 border-amber-400/40 cursor-pointer flex items-center justify-between">
+            <div class="space-y-1">
+                <span class="text-[10px] font-black uppercase bg-amber-400 text-slate-950 px-2 py-0.5 rounded-md">Ранний доступ</span>
+                <h3 class="font-black text-base text-amber-200">LinguaLab PRO — Бесплатно!</h3>
+                <p class="text-xs text-slate-300">Активируй безлимитные жизни ❤️ и все модули, пока действует запуск.</p>
+            </div>
+            <span class="text-2xl">→</span>
+        </div>
+
+        <!-- Достижения -->
+        <div class="card-3d rounded-3xl p-4 space-y-3">
+            <h3 class="text-xs font-black uppercase tracking-wider text-slate-400">Достижения</h3>
+            <div class="flex items-center space-x-3 p-2.5 rounded-2xl bg-slate-900/70">
+                <span class="text-3xl">📘</span>
+                <div class="flex-1">
+                    <h4 class="font-extrabold text-sm">Аналитик грамматики</h4>
+                    <p class="text-xs text-slate-400">Изучить глубокую теорию перед практикой</p>
+                </div>
+                <span class="text-xs font-black text-emerald-400">Активно</span>
+            </div>
+            <div class="flex items-center space-x-3 p-2.5 rounded-2xl bg-slate-900/70">
+                <span class="text-3xl">💎</span>
+                <div class="flex-1">
+                    <h4 class="font-extrabold text-sm">Первая сотня XP</h4>
+                    <p class="text-xs text-slate-400">Набрать 100 очков опыта на тренажерах</p>
+                </div>
+                <span id="badge-100xp" class="text-xs font-black text-slate-500">В процессе</span>
+            </div>
+        </div>
+    </main>
+
+    <!-- 7. ОКНО ГЛУБОКОЙ ТЕОРИИ -->
+    <div id="overlay-theory" class="hidden fixed inset-0 z-40 bg-[#090d16] overflow-y-auto p-4 pb-28 animate-enter">
+        <div class="max-w-md mx-auto space-y-5">
+            <div class="flex items-center justify-between sticky top-0 py-3 bg-[#090d16]/90 backdrop-blur-md z-10 border-b border-slate-800">
+                <button onclick="closeTheory()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 text-slate-200 font-extrabold text-xs">
+                    ← Назад к карте
+                </button>
+                <span class="text-[11px] font-black uppercase bg-sky-500/20 text-sky-300 px-3 py-1 rounded-full">
+                    📘 Глубокая теория
+                </span>
+            </div>
+
+            <div id="theory-content" class="space-y-4"></div>
+
+            <div class="fixed bottom-0 left-0 right-0 p-4 glass-bar border-t border-slate-800">
+                <div class="max-w-md mx-auto">
+                    <button id="btn-theory-start-quiz" class="w-full btn-3d-emerald text-white font-black py-4 rounded-2xl uppercase tracking-wider text-sm">
+                        Теория усвоена! Начать практику →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. ОКНО ТРЕНАЖЕРА ПРАКТИКИ -->
+    <div id="overlay-quiz" class="hidden fixed inset-0 z-40 bg-[#090d16] flex flex-col justify-between p-4 animate-enter">
+        <div class="max-w-md w-full mx-auto">
+            <!-- Шапка урока -->
+            <div class="flex items-center space-x-3 py-1">
+                <button onclick="closeQuiz()" class="text-slate-400 font-black text-xl px-1.5">✕</button>
+                <div class="flex-1 h-3.5 bg-slate-800 rounded-full overflow-hidden p-0.5">
+                    <div id="quiz-bar" class="h-full bg-gradient-to-r from-sky-400 to-emerald-400 rounded-full transition-all duration-300" style="width: 15%"></div>
+                </div>
+                <div id="combo-badge" class="hidden bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black px-2 py-0.5 rounded-lg">
+                    🔥 x2
+                </div>
+                <div class="flex items-center text-rose-400 font-black text-sm">
+                    <span>❤️</span> <span id="quiz-hearts-val" class="ml-1">5</span>
+                </div>
+            </div>
+
+            <!-- Контейнер текущего задания -->
+            <div id="quiz-stage" class="mt-5 space-y-4"></div>
+        </div>
+
+        <!-- Подвал с проверкой и объяснением правила -->
+        <div class="max-w-md w-full mx-auto pt-3">
+            <div id="quiz-explain-box" class="hidden p-4 rounded-2xl mb-3 border">
+                <p id="quiz-explain-title" class="font-black text-base"></p>
+                <p id="quiz-explain-text" class="text-xs mt-1 leading-relaxed"></p>
+            </div>
+            <button id="quiz-main-btn" onclick="handleQuizAction()" class="w-full btn-3d-emerald text-white font-black py-4 rounded-2xl uppercase tracking-wider text-sm">
+                Проверить ответ
+            </button>
+        </div>
+    </div>
+
+    <!-- 9. МОДАЛЬНОЕ ОКНО: МАГАЗИН И ПОДПИСКА PRO (ДЛЯ БУДУЩЕЙ МОНЕТИЗАЦИИ) -->
+    <div id="modal-pro" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-[#111827] border-2 border-slate-700 w-full max-w-md rounded-3xl p-5 space-y-4 animate-enter">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <span class="text-2xl">👑</span>
+                    <h3 class="text-lg font-black text-amber-300">LinguaLab PRO & Бонусы</h3>
+                </div>
+                <button onclick="closeModal('modal-pro')" class="text-slate-400 font-black text-lg">✕</button>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-900/80 to-slate-900 border border-indigo-500/40 space-y-2.5">
+                <span id="pro-price-tag" class="inline-block text-[10px] font-black uppercase bg-emerald-400 text-slate-950 px-2.5 py-0.5 rounded-full">
+                    🎁 Акция запуска: 0 ₽ (Бесплатно)
+                </span>
+                <h4 class="text-base font-black text-white">Что дает статус LinguaLab PRO:</h4>
+                <ul class="text-xs text-slate-200 space-y-1.5 font-semibold">
+                    <li>♾️ <b>Безлимитные жизни (❤️)</b> — учись без ограничений на ошибки</li>
+                    <li>📘 <b>Все глубокие конспекты и таблицы</b> (уровни A1–B2)</li>
+                    <li>⚡ <b>Блиц-тренировки словаря</b> и разбор ловушек</li>
+                </ul>
+                <button id="btn-activate-pro" onclick="activatePro()" class="w-full btn-3d-gold text-slate-950 font-black py-3.5 rounded-2xl text-xs uppercase tracking-wider mt-2">
+                    Активировать PRO бесплатно
+                </button>
+            </div>
+
+            <!-- Покупка за кристаллы (Геймификация) -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-800/70 border border-slate-700">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-2xl">❤️</span>
+                        <div>
+                            <p class="font-extrabold text-xs">Восстановить 5 жизней</p>
+                            <p class="text-[11px] text-slate-400">Полный запас сердечек для уроков</p>
+                        </div>
+                    </div>
+                    <button onclick="refillHearts()" class="bg-sky-500/20 border border-sky-400/40 text-sky-300 font-black text-xs px-3 py-1.5 rounded-xl">
+                        💎 30
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. МОДАЛЬНОЕ ОКНО: ВЫБОР ЯЗЫКА -->
+    <div id="modal-lang" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-[#111827] border-2 border-slate-700 w-full max-w-md rounded-3xl p-5 space-y-4 animate-enter">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-black">Языковые направления</h3>
+                <button onclick="closeModal('modal-lang')" class="text-slate-400 font-black">✕</button>
+            </div>
+            <div class="space-y-2.5">
+                <div onclick="closeModal('modal-lang')" class="p-3.5 rounded-2xl bg-sky-500/15 border-2 border-sky-400 flex items-center justify-between cursor-pointer">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl">🇬🇧</span>
+                        <div>
+                            <p class="font-black text-sm">Английский язык</p>
+                            <p class="text-xs text-sky-300 font-bold">3 полных модуля • Теория + 5 тренажеров</p>
+                        </div>
+                    </div>
+                    <span class="text-sky-400 font-black">✓</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700 opacity-65 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl">🇪🇸</span>
+                        <div>
+                            <p class="font-extrabold text-sm">Испанский язык</p>
+                            <p class="text-xs text-slate-400">Грамматика + Разговорный</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] bg-slate-700 px-2.5 py-1 rounded-lg font-black uppercase">Скоро</span>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-800/60 border border-slate-700 opacity-65 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-3xl">🇩🇪</span>
+                        <div>
+                            <p class="font-extrabold text-sm">Немецкий язык</p>
+                            <p class="text-xs text-slate-400">Падежи и порядок слов</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] bg-slate-700 px-2.5 py-1 rounded-lg font-black uppercase">Скоро</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 11. НИЖНЕЕ МЕНЮ НАВИГАЦИИ -->
+    <nav class="fixed bottom-0 left-0 right-0 z-30 glass-bar border-t border-slate-800/90 px-4 py-2">
+        <div class="max-w-md mx-auto flex justify-around items-center">
+            <button onclick="switchView('learn')" id="nav-btn-learn" class="flex flex-col items-center space-y-0.5 text-sky-400 font-black text-[11px]">
+                <span class="text-xl">🗺️</span>
+                <span>Курс</span>
+            </button>
+            <button onclick="switchView('words')" id="nav-btn-words" class="flex flex-col items-center space-y-0.5 text-slate-400 font-bold text-[11px]">
+                <span class="text-xl">🃏</span>
+                <span>Словарь</span>
+            </button>
+            <button onclick="switchView('league')" id="nav-btn-league" class="flex flex-col items-center space-y-0.5 text-slate-400 font-bold text-[11px]">
+                <span class="text-xl">🏆</span>
+                <span>Рейтинг</span>
+            </button>
+            <button onclick="switchView('profile')" id="nav-btn-profile" class="flex flex-col items-center space-y-0.5 text-slate-400 font-bold text-[11px]">
+                <span class="text-xl">👑</span>
+                <span>Профиль</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        /* =====================================================================
+           НАСТРОЙКА МОНЕТИЗАЦИИ (ДЛЯ ВЛАДЕЛЬЦА ПРОЕКТА)
+           Сейчас MONETIZATION_ACTIVE = false -> Все функции и PRO бесплатны!
+           Когда наберешь аудиторию, поменяй false на true — включится платный PRO.
+           ===================================================================== */
+        const APP_CONFIG = {
+            MONETIZATION_ACTIVE: false,
+            PRO_PRICE_TEXT: "299 ₽ / мес (или 150 ⭐️ Telegram Stars)",
+            PAYMENT_LINK: "https://t.me/lingualab_app_bot"
+        };
+
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // Убираем заставку
+        setTimeout(() => {
+            const sp = document.getElementById('splash');
+            sp.style.opacity = '0';
+            setTimeout(() => sp.classList.add('hidden'), 480);
+        }, 900);
+
+        // Данные пользователя
+        let user = {
+            name: (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user.first_name : 'Чемпион',
+            xp: parseInt(localStorage.getItem('ll_v2_xp')) || 0,
+            gems: parseInt(localStorage.getItem('ll_v2_gems')) || 120,
+            hearts: parseInt(localStorage.getItem('ll_v2_hearts')) || 5,
+            lessons: parseInt(localStorage.getItem('ll_v2_lessons')) || 0,
+            isPro: localStorage.getItem('ll_v2_pro') === 'true',
+            sound: true
+        };
+
+        document.getElementById('user-hello').innerText = `Привет, ${user.name}! 👋`;
+        document.getElementById('prof-name').innerText = user.name;
+
+        // ЗВУКОВОЙ СИНТЕЗАТОР (Web Audio API — без внешних файлов!)
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function playTone(type) {
+            if (!user.sound) return;
+            try {
+                if (!audioCtx) audioCtx = new AudioCtx();
+                const now = audioCtx.currentTime;
+                if (type === 'tap') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.frequency.setValueAtTime(520, now);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.start(now); osc.stop(now + 0.06);
+                } else if (type === 'correct') {
+                    [523.25, 659.25, 783.99].forEach((freq, i) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.frequency.setValueAtTime(freq, now + i * 0.07);
+                        gain.gain.setValueAtTime(0.1, now + i * 0.07);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.2);
+                        osc.connect(gain); gain.connect(audioCtx.destination);
+                        osc.start(now + i * 0.07); osc.stop(now + i * 0.07 + 0.2);
+                    });
+                } else if (type === 'wrong') {
+                    [220, 180].forEach((freq, i) => {
+                        const osc = audioCtx.createOscillator();
+                        osc.type = 'sawtooth';
+                        const gain = audioCtx.createGain();
+                        osc.frequency.setValueAtTime(freq, now + i * 0.12);
+                        gain.gain.setValueAtTime(0.08, now + i * 0.12);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.2);
+                        osc.connect(gain); gain.connect(audioCtx.destination);
+                        osc.start(now + i * 0.12); osc.stop(now + i * 0.12 + 0.2);
+                    });
+                }
+            } catch (e) {}
+        }
+
+        function toggleSound() {
+            user.sound = !user.sound;
+            document.getElementById('sound-btn').innerText = user.sound ? '🔊' : '🔇';
+        }
+
+        function haptic(style = 'light') {
+            if (!tg.HapticFeedback) return;
+            if (style === 'success' || style === 'error') tg.HapticFeedback.notificationOccurred(style);
+            else tg.HapticFeedback.impactOccurred(style);
+        }
+
+        function speakEN(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'en-US';
+                u.rate = 0.92;
+                window.speechSynthesis.speak(u);
+            }
+        }
+
+        // БАЗА КУРСА: 3 МОЩНЫХ ЮНИТА (Глубокая Теория + 5 видов практики)
+        const COURSE_UNITS = [
+            {
+                id: 0,
+                badge: 'Юнит 1 • Фундамент A1',
+                title: 'Железный порядок слов и глагол To Be',
+                color: 'sky',
+                xpReward: 40,
+                theoryHTML: `
+                    <h1 class="text-2xl font-black">1. Архитектура английской фразы и глагол To Be</h1>
+                    <div class="card-3d p-4 rounded-2xl space-y-2">
+                        <h3 class="font-black text-sky-400">🧠 Главный секрет английского</h3>
+                        <p class="text-sm text-slate-200 leading-relaxed">
+                            В русском языке мы меняем окончания слов и легко выбрасываем глагол: <i>«Я — дома», «Этот проект — сложный»</i>. В английском падежей почти нет, поэтому работает <b>железная формула порядка слов</b>:
+                        </p>
+                        <div class="p-3 rounded-xl bg-slate-900 border border-sky-500/30 text-center font-black text-xs text-sky-300">
+                            [1. КТО / ЧТО] + [2. ГЛАГОЛ] + [3. ОСТАЛЬНОЕ]
+                        </div>
+                        <p class="text-xs text-slate-300">
+                            Если в предложении никто не бегает и не работает, на место №2 обязательно ставится глагол-связка <b>to be</b> (быть, являться, находиться).
+                        </p>
+                    </div>
+
+                    <div class="card-3d p-4 rounded-2xl space-y-3">
+                        <h3 class="font-black text-sky-400">📊 3 формы глагола To Be в настоящем</h3>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-sky-500/15 border border-sky-400/30 p-2.5 rounded-xl">
+                                <div class="text-lg font-black text-sky-400">AM</div>
+                                <div class="text-[11px] text-slate-300">Только с <b>I</b></div>
+                            </div>
+                            <div class="bg-indigo-500/15 border border-indigo-400/30 p-2.5 rounded-xl">
+                                <div class="text-lg font-black text-indigo-400">IS</div>
+                                <div class="text-[11px] text-slate-300"><b>He / She / It</b></div>
+                            </div>
+                            <div class="bg-emerald-500/15 border border-emerald-400/30 p-2.5 rounded-xl">
+                                <div class="text-lg font-black text-emerald-400">ARE</div>
+                                <div class="text-[11px] text-slate-300"><b>You / We / They</b></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-3d p-4 rounded-2xl space-y-2.5">
+                        <h3 class="font-black text-sky-400">🔊 Нажми на фразу для озвучки</h3>
+                        <div onclick="speakEN('I am a software engineer')" class="p-3 rounded-xl bg-slate-900 flex justify-between items-center cursor-pointer">
+                            <div>
+                                <p class="font-extrabold text-sm">I <span class="text-sky-400">am</span> a software engineer.</p>
+                                <p class="text-xs text-slate-400">Утверждение: Я (есть) инженер-программист.</p>
+                            </div>
+                            <span>🔊</span>
+                        </div>
+                        <div onclick="speakEN('She is not tired today')" class="p-3 rounded-xl bg-slate-900 flex justify-between items-center cursor-pointer">
+                            <div>
+                                <p class="font-extrabold text-sm">She <span class="text-indigo-400">is not</span> tired today.</p>
+                                <p class="text-xs text-slate-400">Отрицание: просто добавляем NOT после связки.</p>
+                            </div>
+                            <span>🔊</span>
+                        </div>
+                        <div onclick="speakEN('Are they ready for the meeting?')" class="p-3 rounded-xl bg-slate-900 flex justify-between items-center cursor-pointer">
+                            <div>
+                                <p class="font-extrabold text-sm"><span class="text-emerald-400">Are</span> they ready for the meeting?</p>
+                                <p class="text-xs text-slate-400">Вопрос: связка ARE перепрыгивает на первое место!</p>
+                            </div>
+                            <span>🔊</span>
+                        </div>
+                    </div>
+                `,
+                questions: [
+                    {
+                        type: 'choice',
+                        prompt: 'Выбери правильную связку:',
+                        question: 'This new project ___ very important for us.',
+                        options: ['am', 'is', 'are'],
+                        answer: 'is',
+                        explain: 'This new project = он/оно (It), единственное число — ставим IS.'
+                    },
+                    {
+                        type: 'pairs',
+                        prompt: 'Соедини местоимения и перевод:',
+                        pairs: [
+                            { en: 'I am', ru: 'Я являюсь' },
+                            { en: 'She is', ru: 'Она находится' },
+                            { en: 'We are', ru: 'Мы являемся' },
+                            { en: 'Are you?', ru: 'Ты (есть)?' }
+                        ],
+                        explain: 'Отличная работа! Формы am, is, are зависят строго от подлежащего.'
+                    },
+                    {
+                        type: 'builder',
+                        prompt: 'Собери вопрос на английском:',
+                        question: 'Они сейчас в офисе?',
+                        words: ['in the office', 'Are', 'now', 'they', 'Is'],
+                        answer: 'Are they in the office now',
+                        explain: 'В вопросе глагол Are выносится перед подлежащим they.'
+                    },
+                    {
+                        type: 'listen',
+                        prompt: 'Прослушай фразу и собери её:',
+                        audio: 'He is a very smart manager',
+                        words: ['smart', 'He', 'manager', 'is', 'a very', 'are'],
+                        answer: 'He is a very smart manager',
+                        explain: 'На слух: He is a very smart manager (Он очень умный руководитель).'
+                    },
+                    {
+                        type: 'input',
+                        prompt: 'Впиши пропущенный глагол-связку (am / is / are):',
+                        question: 'You ___ my best friend!',
+                        hint: 'С местоимением You всегда идет форма множественного числа (3 буквы)',
+                        answer: 'are',
+                        explain: 'С местоимением You всегда используется форма ARE.'
+                    }
+                ]
+            },
+            {
+                id: 1,
+                badge: 'Юнит 2 • Действия A1+',
+                title: 'Present Simple: Привычки и Do / Does',
+                color: 'purple',
+                xpReward: 50,
+                theoryHTML: `
+                    <h1 class="text-2xl font-black">2. Present Simple: Как говорить о действиях</h1>
+                    <div class="card-3d p-4 rounded-2xl space-y-2">
+                        <h3 class="font-black text-purple-400">⚡ Главное отличие от To Be</h3>
+                        <p class="text-sm text-slate-200 leading-relaxed">
+                            Когда появляется <b>настоящий глагол действия</b> (работать — <i>work</i>, жить — <i>live</i>, знать — <i>know</i>), связки <i>am/is/are</i> больше <b>НЕ НУЖНЫ</b>!
+                        </p>
+                        <div class="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-200">
+                            ❌ <i>I am work every day</i> — грубая ошибка!<br>
+                            ✅ <i>I work every day</i> — правильно.
+                        </div>
+                    </div>
+
+                    <div class="card-3d p-4 rounded-2xl space-y-2.5">
+                        <h3 class="font-black text-purple-400">🔥 Правило окончания -S и помощника DOES</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Для <b>He / She / It</b> (он, она, оно) в утверждении к глаголу прилипает окончание <b>-S</b>. Но как только появляется отрицание (<b>doesn't</b>) или вопрос (<b>Does...?</b>), помощник Does забирает букву -S себе!
+                        </p>
+                        <div onclick="speakEN('She works from home')" class="p-3 rounded-xl bg-slate-900 flex justify-between items-center cursor-pointer">
+                            <div>
+                                <p class="font-extrabold text-sm">She work<span class="text-purple-400">s</span> from home.</p>
+                                <p class="text-xs text-slate-400">Утверждение: у глагола окончание -s.</p>
+                            </div>
+                            <span>🔊</span>
+                        </div>
+                        <div onclick="speakEN('She does not work on Sunday')" class="p-3 rounded-xl bg-slate-900 flex justify-between items-center cursor-pointer">
+                            <div>
+                                <p class="font-extrabold text-sm">She <span class="text-purple-400">doesn't work</span> on Sunday.</p>
+                                <p class="text-xs text-slate-400">Отрицание: у глагола work окончание -s исчезло!</p>
+                            </div>
+                            <span>🔊</span>
+                        </div>
+                    </div>
+                `,
+                questions: [
+                    {
+                        type: 'choice',
+                        prompt: 'Выбери грамматически верный вариант:',
+                        question: 'Мой брат живет в Лондоне.',
+                        options: ['My brother live in London', 'My brother lives in London', 'My brother is live in London'],
+                        answer: 'My brother lives in London',
+                        explain: 'My brother = He (он), поэтому к глаголу live добавляем окончание -s.'
+                    },
+                    {
+                        type: 'pairs',
+                        prompt: 'Соедини английские фразы с переводом:',
+                        pairs: [
+                            { en: 'I work', ru: 'Я работаю' },
+                            { en: 'She works', ru: 'Она работает' },
+                            { en: 'Do you know?', ru: 'Ты знаешь?' },
+                            { en: 'He does not know', ru: 'Он не знает' }
+                        ],
+                        explain: 'Супер! Помощники Do и Does делают всю работу в вопросах и отрицаниях.'
+                    },
+                    {
+                        type: 'builder',
+                        prompt: 'Собери вопрос без ошибки:',
+                        question: 'Она говорит по-английски?',
+                        words: ['speak', 'Does', 'English', 'she', 'speaks'],
+                        answer: 'Does she speak English',
+                        explain: 'Поскольку спереди стоит Does, глагол speak идет без окончания -s!'
+                    },
+                    {
+                        type: 'input',
+                        prompt: 'Впиши правильный вспомогательный глагол (Do или Does):',
+                        question: '___ your friend like coffee?',
+                        hint: 'Your friend = он или она (He / She)',
+                        answer: 'Does',
+                        explain: 'Для единственного числа (He/She/It) в вопросе всегда ставим Does.'
+                    }
+                ]
+            },
+            {
+                id: 2,
+                badge: 'Юнит 3 • Прорыв A2',
+                title: 'Present Continuous vs Simple: Сейчас или вообще?',
+                color: 'emerald',
+                xpReward: 60,
+                theoryHTML: `
+                    <h1 class="text-2xl font-black">3. Прямо сейчас (Continuous) или обычно (Simple)?</h1>
+                    <div class="card-3d p-4 rounded-2xl space-y-2.5">
+                        <h3 class="font-black text-emerald-400">⚡ Как не путать два настоящих времени</h3>
+                        <p class="text-xs text-slate-200 leading-relaxed">
+                            В русском одно предложение «Я читаю книгу» может значить и «я вообще читаю по вечерам», и «я сижу с книгой прямо в эту секунду». Англичане строго разделяют эти две ситуации:
+                        </p>
+                        <div class="grid grid-cols-1 gap-2">
+                            <div onclick="speakEN('I read books every evening')" class="p-3 rounded-xl bg-slate-900 border border-slate-700 cursor-pointer">
+                                <span class="text-[10px] font-black uppercase text-sky-400">Вообще / Регулярно (Present Simple)</span>
+                                <p class="font-black text-sm mt-0.5">I read books every evening. 🔊</p>
+                            </div>
+                            <div onclick="speakEN('I am reading a book right now')" class="p-3 rounded-xl bg-slate-900 border border-emerald-500/40 cursor-pointer">
+                                <span class="text-[10px] font-black uppercase text-emerald-400">Прямо сейчас в процессе (Continuous)</span>
+                                <p class="font-black text-sm mt-0.5">I <span class="text-emerald-400">am reading</span> a book right now. 🔊</p>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                questions: [
+                    {
+                        type: 'choice',
+                        prompt: 'Посмотри на маркер времени (right now — прямо сейчас):',
+                        question: 'Listen! She ___ the piano right now.',
+                        options: ['plays', 'is playing', 'playing'],
+                        answer: 'is playing',
+                        explain: 'Действие происходит прямо сейчас: нужна связка is + глагол с окончанием -ing.'
+                    },
+                    {
+                        type: 'builder',
+                        prompt: 'Собери фразу о процессе прямо сейчас:',
+                        question: 'Я сейчас работаю над новым проектом.',
+                        words: ['working', 'I', 'am', 'on a new project', 'now', 'work'],
+                        answer: 'I am working on a new project now',
+                        explain: 'Формула процесса: I am + глагол с -ing (working).'
+                    },
+                    {
+                        type: 'pairs',
+                        prompt: 'Сопоставь время и маркер:',
+                        pairs: [
+                            { en: 'Right now', ru: 'Прямо сейчас' },
+                            { en: 'Usually', ru: 'Обычно' },
+                            { en: 'Every day', ru: 'Каждый день' },
+                            { en: 'At the moment', ru: 'В данный момент' }
+                        ],
+                        explain: 'Маркеры времени сразу подсказывают, какую конструкцию выбрать!'
+                    }
+                ]
+            }
+        ];
+
+        // СЛОВАРЬ (12 полезных слов с категориями)
+        const VOCAB_DATA = [
+            { en: 'Developer', ru: 'Разработчик', ex: 'He is a senior developer', cat: 'phrases' },
+            { en: 'Usually', ru: 'Обычно', ex: 'I usually wake up at 8', cat: 'phrases' },
+            { en: 'Improve', ru: 'Улучшать', ex: 'We improve our skills daily', cat: 'verbs' },
+            { en: 'Understand', ru: 'Понимать', ex: 'Do you understand the rule?', cat: 'verbs' },
+            { en: 'Available', ru: 'Доступный / Свободен', ex: 'Are you available now?', cat: 'phrases' },
+            { en: 'Explain', ru: 'Объяснять', ex: 'Can you explain this?', cat: 'verbs' },
+            { en: 'Decision', ru: 'Решение', ex: 'It is a smart decision', cat: 'phrases' },
+            { en: 'Prepare', ru: 'Готовиться', ex: 'She is preparing for a test', cat: 'verbs' }
+        ];
+
+        // ОТРИСОВКА КАРТЫ КУРСА
+        function renderCourseMap() {
+            const box = document.getElementById('units-container');
+            box.innerHTML = COURSE_UNITS.map((u, idx) => `
+                <section class="space-y-3">
+                    <div class="flex items-center justify-between px-1">
+                        <div>
+                            <span class="text-[11px] font-black uppercase text-${u.color}-400 tracking-wider">${u.badge}</span>
+                            <h3 class="text-lg font-black text-white">${u.title}</h3>
+                        </div>
+                        <span class="text-xs font-black bg-slate-800 border border-slate-700 px-3 py-1 rounded-full text-amber-300">
+                            +${u.xpReward} XP
+                        </span>
+                    </div>
+
+                    <!-- Карточка Теории -->
+                    <div onclick="openTheory(${idx})" class="card-3d rounded-2xl p-4 flex items-center justify-between cursor-pointer ${idx === 0 ? 'glow-active' : ''}">
+                        <div class="flex items-center space-x-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-400/40 flex items-center justify-center text-2xl">
+                                📘
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-sky-500/20 text-sky-300">Шаг 1 • Теория</span>
+                                <h4 class="font-extrabold text-sm mt-1">Интерактивный конспект</h4>
+                                <p class="text-xs text-slate-400">Формулы, таблицы и озвучка примеров</p>
+                            </div>
+                        </div>
+                        <div class="w-8 h-8 rounded-xl bg-sky-500 text-slate-950 flex items-center justify-center font-black text-sm">→</div>
+                    </div>
+
+                    <!-- Карточка Практики -->
+                    <div onclick="startQuiz(${idx})" class="card-3d rounded-2xl p-4 flex items-center justify-between cursor-pointer">
+                        <div class="flex items-center space-x-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-2xl">
+                                🎯
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Шаг 2 • Практика (${u.questions.length} зад.)</span>
+                                <h4 class="font-extrabold text-sm mt-1">Умный тренажер</h4>
+                                <p class="text-xs text-slate-400">Сборка фраз, пары слов, слух и письмо</p>
+                            </div>
+                        </div>
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-sm">▶</div>
+                    </div>
+                </section>
+            `).join('');
+        }
+
+        // ОТРИСОВКА СЛОВАРЯ
+        function renderVocab(category = 'all') {
+            const filtered = category === 'all' ? VOCAB_DATA : VOCAB_DATA.filter(x => x.cat === category);
+            const grid = document.getElementById('vocab-cards-grid');
+            grid.innerHTML = filtered.map((w, i) => `
+                <div onclick="flipVocabCard(${i}, '${w.en}')" class="perspective h-36 cursor-pointer">
+                    <div id="vcard-${i}" class="flip-inner relative w-full h-full">
+                        <div class="face-front absolute inset-0 card-3d rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[10px] font-black uppercase text-sky-400 bg-sky-500/15 px-2 py-0.5 rounded">EN</span>
+                                <span class="text-xs text-slate-400">🔊</span>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-black text-white">${w.en}</h4>
+                                <p class="text-[11px] text-slate-400">Нажми для перевода</p>
+                            </div>
+                        </div>
+                        <div class="face-back absolute inset-0 bg-indigo-950 border-2 border-indigo-400 rounded-2xl p-4 flex flex-col justify-between">
+                            <span class="text-[10px] font-black uppercase text-indigo-300">Перевод</span>
+                            <div>
+                                <h4 class="text-sm font-black text-white">${w.ru}</h4>
+                                <p class="text-[11px] text-indigo-200 mt-1 italic">"${w.ex}"</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterVocab(cat) {
+            playTone('tap');
+            renderVocab(cat);
+        }
+
+        function flipVocabCard(idx, word) {
+            playTone('tap');
+            haptic('light');
+            speakEN(word);
+            document.getElementById(`vcard-${idx}`).classList.toggle('is-flipped');
+        }
+
+        function startVocabBlitz() {
+            startQuiz(0);
+        }
+
+        // ОТРИСОВКА ТАБЛИЦЫ ЛИДЕРОВ
+        function renderLeaderboard() {
+            const competitors = [
+                { name: 'Алина К.', xp: 240, avatar: '🦊' },
+                { name: 'Максим PRO', xp: 185, avatar: '🦁' },
+                { name: `${user.name} (Ты)`, xp: user.xp, avatar: '🧬', isMe: true },
+                { name: 'Дмитрий В.', xp: 95, avatar: '🐼' },
+                { name: 'София М.', xp: 60, avatar: '🐨' }
+            ].sort((a, b) => b.xp - a.xp);
+
+            document.getElementById('leaderboard-list').innerHTML = competitors.map((c, i) => `
+                <div class="p-3.5 rounded-2xl flex items-center justify-between ${c.isMe ? 'bg-sky-500/20 border-2 border-sky-400' : 'card-3d'}">
+                    <div class="flex items-center space-x-3">
+                        <span class="w-6 text-center font-black text-sm ${i === 0 ? 'text-amber-400' : 'text-slate-400'}">#${i + 1}</span>
+                        <span class="text-2xl">${c.avatar}</span>
+                        <span class="font-extrabold text-sm">${c.name}</span>
+                    </div>
+                    <span class="font-black text-xs text-sky-400">${c.xp} XP</span>
+                </div>
+            `).join('');
+        }
+
+        // ОБНОВЛЕНИЕ ШАПКИ И ПРОФИЛЯ
+        function syncUI() {
+            localStorage.setItem('ll_v2_xp', user.xp);
+            localStorage.setItem('ll_v2_gems', user.gems);
+            localStorage.setItem('ll_v2_hearts', user.hearts);
+            localStorage.setItem('ll_v2_lessons', user.lessons);
+            localStorage.setItem('ll_v2_pro', user.isPro);
+
+            document.getElementById('ui-gems').innerText = user.gems;
+            document.getElementById('ui-hearts').innerText = user.isPro ? '∞' : user.hearts;
+            document.getElementById('prof-xp').innerText = user.xp;
+            document.getElementById('prof-done').innerText = user.lessons;
+
+            const pct = Math.min(100, Math.max(8, (user.xp % 100)));
+            document.getElementById('ui-goal-bar').style.width = `${pct}%`;
+            document.getElementById('ui-goal-text').innerText = `${user.xp % 100} / 100 XP`;
+
+            if (user.xp >= 100) {
+                const b = document.getElementById('badge-100xp');
+                b.innerText = 'Получено 🏆';
+                b.className = 'text-xs font-black text-amber-400';
+            }
+
+            if (user.isPro) {
+                document.getElementById('prof-status').innerText = '👑 Статус: LinguaLab PRO Активен';
+                document.getElementById('btn-activate-pro').innerText = '✓ PRO Статус уже активен';
+            }
+
+            if (APP_CONFIG.MONETIZATION_ACTIVE && !user.isPro) {
+                document.getElementById('pro-price-tag').innerText = `💎 Тариф: ${APP_CONFIG.PRO_PRICE_TEXT}`;
+                document.getElementById('btn-activate-pro').innerText = `Оформить PRO — ${APP_CONFIG.PRO_PRICE_TEXT}`;
+            }
+
+            renderLeaderboard();
+        }
+
+        // НАВИГАЦИЯ ПО ВКЛАДКАМ
+        function switchView(view) {
+            playTone('tap');
+            haptic('light');
+            ['learn', 'words', 'league', 'profile'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+                document.getElementById(`nav-btn-${v}`).className = 'flex flex-col items-center space-y-0.5 text-slate-400 font-bold text-[11px]';
+            });
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+            document.getElementById(`nav-btn-${view}`).className = 'flex flex-col items-center space-y-0.5 text-sky-400 font-black text-[11px] scale-105 transition';
+        }
+
+        function openModal(id) { playTone('tap'); haptic('light'); document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { playTone('tap'); haptic('light'); document.getElementById(id).classList.add('hidden'); }
+
+        // ЛОГИКА PRO И МОНЕТИЗАЦИИ
+        function activatePro() {
+            playTone('correct');
+            haptic('success');
+            if (APP_CONFIG.MONETIZATION_ACTIVE && !user.isPro) {
+                tg.openTelegramLink(APP_CONFIG.PAYMENT_LINK);
+                return;
+            }
+            user.isPro = true;
+            syncUI();
+            if (window.confetti) confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+            closeModal('modal-pro');
+        }
+
+        function refillHearts() {
+            if (user.gems >= 30) {
+                user.gems -= 30;
+                user.hearts = 5;
+                playTone('correct');
+                syncUI();
+                closeModal('modal-pro');
+            } else {
+                playTone('wrong');
+            }
+        }
+
+        // МОДУЛЬ ТЕОРИИ
+        function openTheory(unitIdx) {
+            playTone('tap');
+            haptic('light');
+            const u = COURSE_UNITS[unitIdx];
+            document.getElementById('theory-content').innerHTML = u.theoryHTML;
+            document.getElementById('btn-theory-start-quiz').onclick = () => {
+                closeTheory();
+                startQuiz(unitIdx);
+            };
+            document.getElementById('overlay-theory').classList.remove('hidden');
+        }
+
+        function closeTheory() {
+            playTone('tap');
+            document.getElementById('overlay-theory').classList.add('hidden');
+        }
+
+        // ДВИЖОК ТРЕНАЖЕРА ПРАКТИКИ (5 типов заданий)
+        let quizState = {
+            unitIdx: 0,
+            step: 0,
+            combo: 0,
+            checked: false,
+            choiceVal: '',
+            builtWords: [],
+            pairLeft: null,
+            pairsSolved: 0
+        };
+
+        function startQuiz(unitIdx) {
+            playTone('tap');
+            haptic('medium');
+            quizState = { unitIdx, step: 0, combo: 0, checked: false, choiceVal: '', builtWords: [], pairLeft: null, pairsSolved: 0 };
+            document.getElementById('quiz-hearts-val').innerText = user.isPro ? '∞' : user.hearts;
+            document.getElementById('overlay-quiz').classList.remove('hidden');
+            renderQuizQuestion();
+        }
+
+        function closeQuiz() {
+            playTone('tap');
+            document.getElementById('overlay-quiz').classList.add('hidden');
+        }
+
+        function renderQuizQuestion() {
+            quizState.checked = false;
+            quizState.choiceVal = '';
+            quizState.builtWords = [];
+            quizState.pairLeft = null;
+            quizState.pairsSolved = 0;
+
+            const unit = COURSE_UNITS[quizState.unitIdx];
+            const q = unit.questions[quizState.step];
+            const pct = Math.round((quizState.step / unit.questions.length) * 100);
+            document.getElementById('quiz-bar').style.width = `${Math.max(12, pct)}%`;
+
+            const comboEl = document.getElementById('combo-badge');
+            if (quizState.combo >= 2) {
+                comboEl.innerText = `🔥 Комбо x${quizState.combo}`;
+                comboEl.classList.remove('hidden');
+            } else {
+                comboEl.classList.add('hidden');
+            }
+
+            document.getElementById('quiz-explain-box').classList.add('hidden');
+            const btn = document.getElementById('quiz-main-btn');
+            btn.innerText = 'Проверить ответ';
+            btn.className = 'w-full btn-3d-emerald text-white font-black py-4 rounded-2xl uppercase tracking-wider text-sm';
+
+            const stage = document.getElementById('quiz-stage');
+
+            if (q.type === 'choice') {
+                stage.innerHTML = `
+                    <span class="text-xs font-black uppercase text-sky-400">${q.prompt}</span>
+                    <div class="card-3d p-5 rounded-3xl">
+                        <h3 class="text-xl font-black text-center">${q.question}</h3>
+                    </div>
+                    <div class="space-y-2.5 pt-2">
+                        ${q.options.map(opt => `
+                            <div onclick="selectOpt(this, '${opt}')" class="q-opt card-3d p-4 rounded-2xl font-extrabold text-center cursor-pointer text-base">
+                                ${opt}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (q.type === 'builder' || q.type === 'listen') {
+                stage.innerHTML = `
+                    <span class="text-xs font-black uppercase text-sky-400">${q.prompt}</span>
+                    <div onclick="${q.audio ? `speakEN('${q.audio}')` : ''}" class="card-3d p-4 rounded-3xl flex items-center justify-between cursor-pointer">
+                        <h3 class="text-lg font-extrabold">${q.audio ? '🔊 Нажми, чтобы прослушать фразу' : q.question}</h3>
+                        ${q.audio ? '<span class="text-2xl">🔊</span>' : ''}
+                    </div>
+                    <div id="builder-drop" class="min-h-[68px] bg-slate-900/90 border-2 border-dashed border-slate-700 rounded-2xl p-3 flex flex-wrap gap-2 items-center"></div>
+                    <div class="flex flex-wrap gap-2 justify-center pt-2">
+                        ${q.words.map((w, i) => `
+                            <button id="wb-${i}" onclick="toggleBuilderWord('${w}', ${i})" class="card-3d px-4 py-2.5 rounded-xl font-extrabold text-sm">
+                                ${w}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+                if (q.audio) speakEN(q.audio);
+            } else if (q.type === 'pairs') {
+                const shuffledRu = [...q.pairs].sort(() => Math.random() - 0.5);
+                stage.innerHTML = `
+                    <span class="text-xs font-black uppercase text-sky-400">${q.prompt}</span>
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <div class="space-y-2.5">
+                            ${q.pairs.map((p, i) => `
+                                <div id="pleft-${i}" onclick="tapPairLeft(${i}, '${p.en}')" class="pair-l card-3d p-3.5 rounded-2xl font-extrabold text-center text-sm cursor-pointer">
+                                    ${p.en}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="space-y-2.5">
+                            ${shuffledRu.map((p, i) => `
+                                <div id="pright-${i}" onclick="tapPairRight(${i}, '${p.en}')" class="pair-r card-3d p-3.5 rounded-2xl font-extrabold text-center text-sm cursor-pointer">
+                                    ${p.ru}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (q.type === 'input') {
+                stage.innerHTML = `
+                    <span class="text-xs font-black uppercase text-sky-400">${q.prompt}</span>
+                    <div class="card-3d p-5 rounded-3xl space-y-2">
+                        <h3 class="text-xl font-black text-center">${q.question}</h3>
+                        <p class="text-xs text-slate-400 text-center">💡 Подсказка: ${q.hint}</p>
+                    </div>
+                    <input id="q-input-field" type="text" placeholder="Введи ответ..." class="w-full bg-slate-900 border-2 border-slate-700 focus:border-sky-400 outline-none rounded-2xl p-4 font-black text-center text-lg text-white">
+                `;
+            }
+        }
+
+        function selectOpt(el, val) {
+            if (quizState.checked) return;
+            playTone('tap');
+            document.querySelectorAll('.q-opt').forEach(o => o.classList.remove('opt-selected'));
+            el.classList.add('opt-selected');
+            quizState.choiceVal = val;
+        }
+
+        function toggleBuilderWord(word, idx) {
+            if (quizState.checked) return;
+            playTone('tap');
+            const btn = document.getElementById(`wb-${idx}`);
+            const pos = quizState.builtWords.findIndex(x => x.idx === idx);
+            if (pos > -1) {
+                quizState.builtWords.splice(pos, 1);
+                btn.classList.remove('opacity-25');
+            } else {
+                quizState.builtWords.push({ word, idx });
+                btn.classList.add('opacity-25');
+            }
+            document.getElementById('builder-drop').innerHTML = quizState.builtWords.map(item => `
+                <span onclick="toggleBuilderWord('${item.word}', ${item.idx})" class="bg-sky-500/20 border border-sky-400 text-sky-200 px-3 py-1.5 rounded-xl font-extrabold text-sm cursor-pointer animate-pop">
+                    ${item.word}
+                </span>
+            `).join('');
+        }
+
+        function tapPairLeft(idx, key) {
+            playTone('tap');
+            speakEN(key);
+            document.querySelectorAll('.pair-l').forEach(el => el.classList.remove('opt-selected'));
+            document.getElementById(`pleft-${idx}`).classList.add('opt-selected');
+            quizState.pairLeft = { idx, key };
+        }
+
+        function tapPairRight(idx, matchKey) {
+            if (!quizState.pairLeft) return;
+            const rightEl = document.getElementById(`pright-${idx}`);
+            const leftEl = document.getElementById(`pleft-${quizState.pairLeft.idx}`);
+
+            if (quizState.pairLeft.key === matchKey) {
+                playTone('correct');
+                leftEl.classList.remove('opt-selected');
+                leftEl.classList.add('pair-matched');
+                rightEl.classList.add('pair-matched');
+                quizState.pairLeft = null;
+                quizState.pairsSolved++;
+
+                const totalPairs = COURSE_UNITS[quizState.unitIdx].questions[quizState.step].pairs.length;
+                if (quizState.pairsSolved === totalPairs) {
+                    handleQuizAction(true);
+                }
+            } else {
+                playTone('wrong');
+                rightEl.classList.add('animate-shake');
+                setTimeout(() => rightEl.classList.remove('animate-shake'), 400);
+            }
+        }
+
+        function handleQuizAction(forcePairsSuccess = false) {
+            const unit = COURSE_UNITS[quizState.unitIdx];
+            const q = unit.questions[quizState.step];
+
+            if (quizState.checked) {
+                quizState.step++;
+                if (quizState.step < unit.questions.length) {
+                    renderQuizQuestion();
+                } else {
+                    showLessonVictory(unit);
+                }
+                return;
+            }
+
+            let isCorrect = false;
+            if (q.type === 'pairs') {
+                if (!forcePairsSuccess && quizState.pairsSolved < q.pairs.length) return;
+                isCorrect = true;
+            } else {
+                let userAns = '';
+                if (q.type === 'choice') userAns = quizState.choiceVal;
+                if (q.type === 'builder' || q.type === 'listen') userAns = quizState.builtWords.map(x => x.word).join(' ');
+                if (q.type === 'input') userAns = (document.getElementById('q-input-field').value || '').trim();
+                if (!userAns) return;
+                isCorrect = userAns.toLowerCase() === q.answer.toLowerCase();
+            }
+
+            quizState.checked = true;
+            const box = document.getElementById('quiz-explain-box');
+            const title = document.getElementById('quiz-explain-title');
+            const desc = document.getElementById('quiz-explain-text');
+            const btn = document.getElementById('quiz-main-btn');
+
+            box.classList.remove('hidden');
+
+            if (isCorrect) {
+                playTone('correct');
+                haptic('success');
+                quizState.combo++;
+                if (q.answer) speakEN(q.answer);
+                box.className = 'p-4 rounded-2xl mb-3 bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 animate-enter';
+                title.innerText = '✨ Блестяще! Правильный ответ';
+                desc.innerText = q.explain;
+            } else {
+                playTone('wrong');
+                haptic('error');
+                quizState.combo = 0;
+                if (!user.isPro) user.hearts = Math.max(1, user.hearts - 1);
+                document.getElementById('quiz-hearts-val').innerText = user.isPro ? '∞' : user.hearts;
+                document.getElementById('quiz-stage').classList.add('animate-shake');
+                setTimeout(() => document.getElementById('quiz-stage').classList.remove('animate-shake'), 450);
+
+                box.className = 'p-4 rounded-2xl mb-3 bg-rose-500/15 border border-rose-500/40 text-rose-200 animate-enter';
+                title.innerText = `💡 Правильный ответ: ${q.answer}`;
+                desc.innerText = q.explain;
+            }
+
+            btn.innerText = (quizState.step === unit.questions.length - 1) ? 'Забрать награду 🏆' : 'Продолжить →';
+            btn.className = 'w-full btn-3d-sky text-white font-black py-4 rounded-2xl uppercase tracking-wider text-sm';
+        }
+
+        function showLessonVictory(unit) {
+            playTone('correct');
+            haptic('success');
+            if (window.confetti) confetti({ particleCount: 100, spread: 75, origin: { y: 0.6 } });
+
+            user.xp += unit.xpReward;
+            user.gems += 15;
+            user.lessons += 1;
+            syncUI();
+
+            document.getElementById('quiz-bar').style.width = '100%';
+            document.getElementById('quiz-explain-box').classList.add('hidden');
+
+            document.getElementById('quiz-stage').innerHTML = `
+                <div class="text-center py-6 space-y-4 animate-enter">
+                    <div class="w-24 h-24 mx-auto rounded-3xl bg-amber-400/20 border-2 border-amber-400 flex items-center justify-center text-5xl shadow-2xl animate-float">
+                        🏆
+                    </div>
+                    <h2 class="text-2xl font-black">Модуль блестяще пройден!</h2>
+                    <p class="text-xs text-slate-300">Ты разобрал грамматику и закрепил её на практике.</p>
+                    <div class="grid grid-cols-2 gap-3 pt-3">
+                        <div class="card-3d p-3.5 rounded-2xl">
+                            <span class="text-[11px] text-slate-400 font-bold uppercase">Опыт</span>
+                            <p class="text-2xl font-black text-sky-400">+${unit.xpReward} XP</p>
+                        </div>
+                        <div class="card-3d p-3.5 rounded-2xl">
+                            <span class="text-[11px] text-slate-400 font-bold uppercase">Кристаллы</span>
+                            <p class="text-2xl font-black text-amber-400">+15 💎</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const btn = document.getElementById('quiz-main-btn');
+            btn.innerText = 'На карту курса';
+            btn.onclick = () => {
+                btn.onclick = () => handleQuizAction();
+                closeQuiz();
+            };
+        }
+
+        // Инициализация при старте
+        renderCourseMap();
+        renderVocab();
+        syncUI();
+    </script>
+</body>
+</html>
